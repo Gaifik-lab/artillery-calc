@@ -33,6 +33,7 @@ const res = {
   ElevMil: document.getElementById('resElevMil'),
   ElevDeg: document.getElementById('resElevDeg'),
   AzCorr: document.getElementById('resAzCorr'),
+  FinalAz: document.getElementById('resFinalAz'),
   TOF: document.getElementById('resTOF'),
   DeltaH: document.getElementById('resDeltaH'),
   EffDist: document.getElementById('resEffDist')
@@ -294,6 +295,7 @@ calcBtn.addEventListener('click', () => {
     res.ElevMil.textContent = "FAIL";
     res.ElevDeg.textContent = "-";
     res.AzCorr.textContent = "-";
+    if (res.FinalAz) res.FinalAz.textContent = "-";
     res.TOF.textContent = "-";
     res.EffDist.textContent = "-";
     return;
@@ -308,6 +310,12 @@ calcBtn.addEventListener('click', () => {
   res.ElevMil.textContent = best.elev.toFixed(1);
   res.ElevDeg.textContent = elevDeg.toFixed(1);
   res.AzCorr.textContent = best.azCorr.toFixed(1);
+  
+  let finalAz = azimuthMil + best.azCorr;
+  if (finalAz < 0) finalAz += 6400;
+  if (finalAz >= 6400) finalAz -= 6400;
+  if (res.FinalAz) res.FinalAz.textContent = finalAz.toFixed(1);
+
   res.TOF.textContent = best.tof.toFixed(1);
   res.EffDist.textContent = best.effDist.toFixed(1);
 });
