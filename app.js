@@ -133,11 +133,17 @@ calcBtn.addEventListener('click', () => {
     return;
   }
 
+  // Ensure default fallback if input is empty
+  const getVal = (el, def) => {
+    const v = parseFloat(el.value);
+    return isNaN(v) ? def : v;
+  };
+
   // Calculate Geodetic Distance & Azimuth
-  const gX = parseFloat(els.gunX.value);
-  const gY = parseFloat(els.gunY.value);
-  const tX = parseFloat(els.tgtX.value);
-  const tY = parseFloat(els.tgtY.value);
+  const gX = getVal(els.gunX, 0);
+  const gY = getVal(els.gunY, 0);
+  const tX = getVal(els.tgtX, 0);
+  const tY = getVal(els.tgtY, 0);
 
   const dx = tX - gX; // Easting diff
   const dy = tY - gY; // Northing diff
@@ -149,11 +155,11 @@ calcBtn.addEventListener('click', () => {
   let azimuthMil = azRad * (3200 / Math.PI);
   if (azimuthMil < 0) azimuthMil += 6400;
 
-  const altDiff = parseFloat(els.tgtAlt.value) - parseFloat(els.gunAlt.value);
+  const altDiff = getVal(els.tgtAlt, 0) - getVal(els.gunAlt, 0);
   
-  const windDirVal = parseFloat(els.windDir.value);
+  const windDirVal = getVal(els.windDir, 0);
   const windUnit = els.windUnit.value;
-  const windSpeed = parseFloat(els.windSpeed.value);
+  const windSpeed = getVal(els.windSpeed, 0);
 
   let windDirRad = 0;
   if (windUnit === 'mil') {
@@ -169,9 +175,9 @@ calcBtn.addEventListener('click', () => {
   const windTail = -windSpeed * Math.cos(deltaAzRad);
   const windCross = -windSpeed * Math.sin(deltaAzRad);
 
-  const tempC = parseFloat(els.tempC.value);
-  const pressure = parseFloat(els.pressure.value);
-  const humidity = parseFloat(els.humidity.value);
+  const tempC = getVal(els.tempC, 15);
+  const pressure = getVal(els.pressure, 1013.25);
+  const humidity = getVal(els.humidity, 50);
 
   const allData = weaponsDb[currentWeapon];
   const densPct = calculateDensityPct(tempC, pressure, humidity);
