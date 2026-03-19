@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#3b82f6">
+  <title>Артиллерийский Калькулятор</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="glass-panel">
+      <h1>Арт-Калькулятор</h1>
+      <div class="header-inputs">
+        <label>
+          Орудие:
+          <select id="weaponSelect" style="width: 100%; margin-top: 0.5rem;">
+            <option value="">Загрузка таблиц...</option>
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <!-- Positions Section -->
+      <section class="glass-panel card">
+        <h2>Позиции</h2>
+        <div class="grid-2">
+          <div class="input-group">
+            <label>Координаты огневой (X Y)</label>
+            <div class="coord-inputs">
+              <input type="number" id="gunX" value="14760" placeholder="X">
+              <input type="number" id="gunY" value="12245" placeholder="Y">
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Координаты цели (X Y)</label>
+            <div class="coord-inputs">
+              <input type="number" id="tgtX" value="4120" placeholder="X">
+              <input type="number" id="tgtY" value="7480" placeholder="Y">
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Высота огневой, м</label>
+            <input type="number" id="gunAlt" value="5">
+          </div>
+          <div class="input-group">
+            <label>Высота цели, м</label>
+            <input type="number" id="tgtAlt" value="14">
+          </div>
+        </div>
+      </section>
+
+      <!-- Weather Section -->
+      <section class="glass-panel card">
+        <h2>Метеоусловия</h2>
+        <div class="grid-2">
+          <div class="input-group">
+            <label>Направление ветра (азимут, откуда дует)</label>
+            <div class="coord-inputs">
+              <input type="number" id="windDir" value="0">
+              <select id="windUnit" style="width: 80px;">
+                <option value="mil">мил</option>
+                <option value="deg">град</option>
+              </select>
+            </div>
+          </div>
+          <div class="input-group">
+            <label>Скорость ветра, м/с</label>
+            <input type="number" id="windSpeed" value="0" step="0.1" min="0">
+          </div>
+          <div class="input-group">
+            <label>Температура воздуха, °C</label>
+            <input type="number" id="tempC" value="20" step="1">
+          </div>
+          <div class="input-group">
+            <label>Давление, гПа</label>
+            <input type="number" id="pressure" value="1009" step="1">
+          </div>
+          <div class="input-group">
+            <label>Влажность, %</label>
+            <input type="number" id="humidity" value="75" min="0" max="100">
+          </div>
+        </div>
+      </section>
+
+      <!-- Action -->
+      <button id="calcBtn" class="primary-btn pulse">РАССЧИТАТЬ</button>
+
+      <!-- Results Section -->
+      <section class="glass-panel card results-card hidden" id="resultsPanel">
+        <h2>Результат</h2>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; text-align: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.5rem;" id="computedWind"></div>
+        <div class="results-grid">
+          <div class="res-item"><span class="label">Дистанция, м</span><span class="val" id="resDist">-</span></div>
+          <div class="res-item"><span class="label">Азимут, мил</span><span class="val" id="resAz">-</span></div>
+          <div class="res-item highlight"><span class="label">Лучший заряд</span><span class="val" id="resCharge">-</span></div>
+          <div class="res-item highlight"><span class="label">Угол возвыш. (мил)</span><span class="val" id="resElevMil">-</span></div>
+          <div class="res-item"><span class="label">Угол возвыш. (°)</span><span class="val" id="resElevDeg">-</span></div>
+          <div class="res-item"><span class="label">Попр. по азимуту</span><span class="val" id="resAzCorr">-</span></div>
+          <div class="res-item"><span class="label">Время полета (с)</span><span class="val" id="resTOF">-</span></div>
+          <div class="res-item"><span class="label">Δ Высоты (м)</span><span class="val" id="resDeltaH">-</span></div>
+          <div class="res-item"><span class="label">R-эфф (м)</span><span class="val" id="resEffDist">-</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="tables/tables.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then((registration) => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          }, (err) => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
