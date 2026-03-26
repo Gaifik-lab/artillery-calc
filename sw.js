@@ -1,4 +1,7 @@
-const CACHE_NAME = 'arty-calc-v1';
+// Increment version when deploying updates
+const CACHE_VERSION = 2;
+const CACHE_NAME = `arty-calc-v${CACHE_VERSION}`;
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -7,56 +10,46 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  // Cache the generated JS bundle
   './tables/tables.js'
 ];
 
-// Install Event
+// Install: cache all assets
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache');
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE))
   );
 });
 
-// Activate Event
+// Activate: clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then(names =>
+      Promise.all(
+        names
+          .filter(name => name !== CACHE_NAME)
+          .map(name => caches.delete(name))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
-// Fetch Event (Network First, fallback to Cache First)
+// Fetch: network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      // First try to fetch from network to get updates instantly
-      return fetch(event.request)
-        .then((netResponse) => {
-           // Update cache
-           return caches.open(CACHE_NAME).then((cache) => {
-             cache.put(event.request, netResponse.clone());
-             return netResponse;
-           });
+    fetch(event.request)
+      .then(netResponse => {
+        const clone = netResponse.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return netResponse;
+      })
+      .catch(() =>
+        caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
         })
-        .catch(() => {
-           // On offline, return cached
-           if (response) return response;
-           if (event.request.url.includes('index.html')) {
-             return caches.match('./index.html');
-           }
-        });
-    })
+      )
   );
 });

@@ -2,14 +2,21 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
+$csvFiles = Get-ChildItem -Filter *.csv | Sort-Object Name
+$count = 0
+
 $content = "const tablesRawData = {`n"
-Get-ChildItem -Filter *.csv | ForEach-Object {
-    $name = $_.BaseName
-    $text = Get-Content $_.FullName -Raw
+foreach ($file in $csvFiles) {
+    $name = $file.BaseName
+    $text = Get-Content $file.FullName -Raw
     if ($text) {
         $text = $text -replace '`', '\`'
-        $content += "`"$name`": ``$text``,`n"
+        $content += "`"$name`": ``$text``,"
+        $content += "`n"
+        $count++
     }
 }
 $content += "};"
+
 Set-Content -Path "tables.js" -Value $content -Encoding UTF8
+Write-Host "Generated tables.js with $count weapon tables."

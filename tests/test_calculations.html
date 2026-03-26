@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Арт-Калькулятор — Unit Tests</title>
+  <style>
+    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 1rem; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f44747; font-weight: bold; }
+    h2 { color: #569cd6; margin-top: 1.5rem; }
+    pre { margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+<h1>Unit Tests</h1>
+<div id="output"></div>
+<script>
+// Minimal test framework
+let passed = 0, failed = 0;
+const out = document.getElementById('output');
+
+function log(msg, ok) {
+  const el = document.createElement('pre');
+  el.className = ok ? 'pass' : 'fail';
+  el.textContent = (ok ? '✓ ' : '✗ ') + msg;
+  out.appendChild(el);
+  ok ? passed++ : failed++;
+}
+
+function section(name) {
+  const h = document.createElement('h2');
+  h.textContent = name;
+  out.appendChild(h);
+}
+
+function assertClose(actual, expected, tolerance, label) {
+  const ok = Math.abs(actual - expected) <= tolerance;
+  log(`${label}: ${actual.toFixed(4)} ≈ ${expected} (±${tolerance})`, ok);
+  if (!ok) log(`  EXPECTED ${expected}, GOT ${actual}`, false);
+}
+
+function assertEqual(actual, expected, label) {
+  const ok = actual === expected;
+  log(`${label}: ${JSON.stringify(actual)} === ${JSON.stringify(expected)}`, ok);
+}
+</script>
+<script>
+// ---- Inline copies of pure functions from app.js for testing ----
+
+const MILS_FULL_CIRCLE = 6400;
+const MILS_HALF_CIRCLE = 3200;
+const MILS_TO_RAD = Math.PI / MILS_HALF_CIRCLE;
+const STD_TEMP_C = 15;
+const STD_PRESSURE_HPA = 1013.25;
+const STD_TEMP_K = 288.15;
+const Rd = 287.058;
+const Rv = 461.495;
+
+function lerp(a, b, t) { return (1 - t) * a + t * b; }
+
+function calculateDensityPct(tempC, pressureHPa, humidity) {
+  pressureHPa = pressureHPa || STD_PRESSURE_HPA;
+  if (humidity === undefined || humidity === null) humidity = 0;
+  if (humidity > 1) humidity /= 100;
+  const tempK = tempC + 273.15;
+  const es = 6.1078 * Math.pow(10, (7.5 * tempC) / (237.3 + tempC));
+  const pv = es * humidity;
+  const pd = pressureHPa - pv;
+  const currentRho = (pd / (Rd * tempK)) + (pv / (Rv * tempK));
+  const stdRho = STD_PRESSURE_HPA / (Rd * STD_TEMP_K);
+  return ((currentRho - stdRho) / stdRho) * 100;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const data = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const cols = line.split(/[,\t;]/).map(v => parseFloat(v.replace(',', '.')));
+    if (!isNaN(cols[0]) && !isNaN(cols[1])) data.push(cols);
+  }
+  return data;
+}
+
+function normalizeAz(az) {
+  az = az % MILS_FULL_CIRCLE;
+  return az < 0 ? az + MILS_FULL_CIRCLE : az;
+}
+
+function findBracket(table, dist) {
+  for (let i = 0; i < table.length - 1; i++) {
+    if (dist >= table[i][1] && dist <= table[i + 1][1]) {
+      const span = table[i + 1][1] - table[i][1];
+      return { row1: table[i], row2: table[i + 1], factor: span === 0 ? 0 : (dist - table[i][1]) / span };
+    }
+  }
+  return null;
+}
+</script>
+<script>
+// ---- Tests ----
+
+section('lerp');
+assertClose(lerp(0, 10, 0), 0, 0.001, 'lerp(0,10,0)=0');
+assertClose(lerp(0, 10, 1), 10, 0.001, 'lerp(0,10,1)=10');
+assertClose(lerp(0, 10, 0.5), 5, 0.001, 'lerp(0,10,0.5)=5');
+assertClose(lerp(-5, 5, 0.5), 0, 0.001, 'lerp(-5,5,0.5)=0');
+
+section('normalizeAz');
+assertClose(normalizeAz(0), 0, 0.001, 'normalizeAz(0)');
+assertClose(normalizeAz(6400), 0, 0.001, 'normalizeAz(6400)=0');
+assertClose(normalizeAz(-100), 6300, 0.001, 'normalizeAz(-100)=6300');
+assertClose(normalizeAz(7000), 600, 0.001, 'normalizeAz(7000)=600');
+
+section('calculateDensityPct');
+assertClose(calculateDensityPct(15, 1013.25, 0), 0, 0.5, 'ISA standard → ~0%');
+const hotDens = calculateDensityPct(35, 1013.25, 0);
+log(`Hot air (35°C): density deviation = ${hotDens.toFixed(2)}% (should be negative)`, hotDens < 0);
+const coldDens = calculateDensityPct(-10, 1013.25, 0);
+log(`Cold air (-10°C): density deviation = ${coldDens.toFixed(2)}% (should be positive)`, coldDens > 0);
+const highP = calculateDensityPct(15, 1050, 0);
+log(`High pressure (1050 hPa): density deviation = ${highP.toFixed(2)}% (should be positive)`, highP > 0);
+
+section('parseCSV');
+const csv1 = "H1,H2,H3\n1,100,200\n2,200,300\n";
+const r1 = parseCSV(csv1);
+assertEqual(r1.length, 2, 'parseCSV: 2 rows');
+assertEqual(r1[0][0], 1, 'parseCSV: first cell = 1');
+assertEqual(r1[1][2], 300, 'parseCSV: last cell = 300');
+
+const csvEmpty = "Header\n\n\n";
+assertEqual(parseCSV(csvEmpty).length, 0, 'parseCSV: empty lines → 0 rows');
+
+const csvSemicolon = "H1;H2\n1;100\n2;200";
+assertEqual(parseCSV(csvSemicolon).length, 2, 'parseCSV: semicolon delimiter');
+
+section('findBracket');
+const testTable = [[0,100],[0,200],[0,300],[0,400]];
+const b1 = findBracket(testTable, 150);
+assertClose(b1.factor, 0.5, 0.001, 'findBracket(150) factor=0.5');
+assertEqual(findBracket(testTable, 50), null, 'findBracket(50) → null (below range)');
+assertEqual(findBracket(testTable, 500), null, 'findBracket(500) → null (above range)');
+const b2 = findBracket(testTable, 100);
+assertClose(b2.factor, 0, 0.001, 'findBracket(100) factor=0 (exact match)');
+
+section('Wind decomposition');
+// Headwind: wind from same direction as target → windTail should be negative
+{
+  const windSpeed = 5;
+  const windDirRad = 0; // wind from North
+  const targetAzRad = 0; // shooting North
+  const delta = windDirRad - targetAzRad;
+  const windTail = -windSpeed * Math.cos(delta);
+  log(`Headwind (same dir): windTail = ${windTail.toFixed(1)} (should be -5)`, windTail < -4.9);
+}
+// Tailwind: wind from opposite direction
+{
+  const windSpeed = 5;
+  const windDirRad = Math.PI; // wind from South
+  const targetAzRad = 0; // shooting North
+  const delta = windDirRad - targetAzRad;
+  const windTail = -windSpeed * Math.cos(delta);
+  log(`Tailwind (opposite dir): windTail = ${windTail.toFixed(1)} (should be +5)`, windTail > 4.9);
+}
+
+section('Weather correction signs');
+// Verify: headwind → positive correction (increase eff. range)
+// Using M777 charge 0, dist 1000m values: kHead=2.6, kTail=-2.5
+{
+  const kHead = 2.6, kTail = -2.5;
+  const headWind = -5; // встречный
+  const tailWind = 5;  // попутный
+
+  let corrHead = 0;
+  corrHead += Math.abs(headWind) * kHead; // 5 * 2.6 = +13
+  log(`Headwind correction: +${corrHead.toFixed(1)}m (should be positive)`, corrHead > 0);
+
+  let corrTail = 0;
+  corrTail += tailWind * kTail; // 5 * (-2.5) = -12.5
+  log(`Tailwind correction: ${corrTail.toFixed(1)}m (should be negative)`, corrTail < 0);
+}
+
+section('Summary');
+const total = passed + failed;
+const el = document.createElement('h2');
+el.style.color = failed === 0 ? '#4ec9b0' : '#f44747';
+el.textContent = `${passed}/${total} passed` + (failed > 0 ? `, ${failed} FAILED` : ' — ALL PASS');
+out.appendChild(el);
+</script>
+</body>
+</html>
