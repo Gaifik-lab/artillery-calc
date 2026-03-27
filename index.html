@@ -85,6 +85,9 @@
         </div>
       </section>
 
+      <!-- Validation -->
+      <div id="validationMsg" class="validation-msg hidden" role="alert"></div>
+
       <!-- Action -->
       <button id="calcBtn" class="primary-btn pulse">РАССЧИТАТЬ</button>
 
@@ -115,6 +118,31 @@
               <tr><th>Заряд</th><th>Угол (мил)</th><th>Азимут (мил)</th><th>TOF (с)</th></tr>
             </thead>
             <tbody id="allChargesBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- History -->
+      <section class="glass-panel card hidden" id="historyPanel">
+        <h2>
+          История расчётов
+          <button id="clearHistoryBtn" class="clear-history-btn" aria-label="Очистить историю">✕</button>
+        </h2>
+        <div class="table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Орудие</th>
+                <th>Огневая</th>
+                <th>Цель</th>
+                <th>Заряд</th>
+                <th>Угол</th>
+                <th>Азимут</th>
+                <th>TOF</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
           </table>
         </div>
       </section>

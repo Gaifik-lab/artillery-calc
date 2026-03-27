@@ -225,3 +225,65 @@ input:focus, select:focus {
 
 /* Utility */
 .hidden { display: none; }
+
+/* Validation */
+.validation-msg {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  color: #fca5a5;
+}
+
+input.input-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+}
+
+/* History */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.history-table th,
+.history-table td {
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+
+.history-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.history-table tr {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.history-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.clear-history-btn {
+  float: right;
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.clear-history-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+}

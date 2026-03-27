@@ -56,6 +56,10 @@ const resultsPanel = document.getElementById('resultsPanel');
 const computedWind = document.getElementById('computedWind');
 const allChargesPanel = document.getElementById('allChargesPanel');
 const allChargesBody = document.getElementById('allChargesBody');
+const validationMsg = document.getElementById('validationMsg');
+const historyPanel = document.getElementById('historyPanel');
+const historyBody = document.getElementById('historyBody');
+const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
 const els = {
   gunX: document.getElementById('gunX'),
@@ -119,15 +123,19 @@ function calculateDensityPct(tempC, pressureHPa, humidity) {
   return ((currentRho - stdRho) / stdRho) * 100;
 }
 
-/** Parse CSV text into array of numeric arrays (skips header) */
+/** Parse CSV text into array of numeric arrays (skips header).
+ *  Non-numeric values (e.g. "-") are treated as 0. */
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   const data = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    const cols = line.split(/[,\t;]/).map(v => parseFloat(v.replace(',', '.')));
-    if (!isNaN(cols[0]) && !isNaN(cols[1])) {
+    const cols = line.split(/[,\t;]/).map(v => {
+      const n = parseFloat(v.replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    });
+    if (cols.length >= 2 && cols[1] > 0) {
       data.push(cols);
     }
   }
@@ -225,6 +233,89 @@ function normalizeAz(az) {
   return az < 0 ? az + MILS_FULL_CIRCLE : az;
 }
 
+// --- Input Validation ---
+
+const MIN_COORD_DIGITS = 5; // Arma 3: 5-digit minimum (6-digit for precision)
+
+function clearValidation() {
+  validationMsg.classList.add('hidden');
+  validationMsg.textContent = '';
+  document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+}
+
+function showError(msg, errorEls) {
+  validationMsg.textContent = msg;
+  validationMsg.classList.remove('hidden');
+  if (errorEls) errorEls.forEach(el => el.classList.add('input-error'));
+}
+
+/**
+ * Validate all inputs before calculation.
+ * @returns {boolean} true if valid
+ */
+function validateInputs() {
+  clearValidation();
+  const errors = [];
+  const errorFields = [];
+
+  // Coordinate validation: must be filled and at least 5 digits
+  const coordFields = [
+    { el: els.gunX, name: 'Огневая X' },
+    { el: els.gunY, name: 'Огневая Y' },
+    { el: els.tgtX, name: 'Цель X' },
+    { el: els.tgtY, name: 'Цель Y' }
+  ];
+
+  for (const f of coordFields) {
+    const raw = f.el.value.trim();
+    if (!raw) {
+      errors.push(`${f.name}: не заполнено`);
+      errorFields.push(f.el);
+      continue;
+    }
+    // Count digits only (ignore minus sign, decimal point)
+    const digitCount = raw.replace(/[^0-9]/g, '').length;
+    if (digitCount < MIN_COORD_DIGITS) {
+      errors.push(`${f.name}: минимум ${MIN_COORD_DIGITS} цифр (сейчас ${digitCount})`);
+      errorFields.push(f.el);
+    }
+  }
+
+  // Pressure range
+  const pVal = parseFloat(els.pressure.value);
+  if (!isNaN(pVal) && (pVal < 800 || pVal > 1100)) {
+    errors.push(`Давление вне диапазона 800–1100 гПа`);
+    errorFields.push(els.pressure);
+  }
+
+  // Humidity range
+  const hVal = parseFloat(els.humidity.value);
+  if (!isNaN(hVal) && (hVal < 0 || hVal > 100)) {
+    errors.push(`Влажность вне диапазона 0–100%`);
+    errorFields.push(els.humidity);
+  }
+
+  // Wind speed non-negative
+  const wVal = parseFloat(els.windSpeed.value);
+  if (!isNaN(wVal) && wVal < 0) {
+    errors.push(`Скорость ветра не может быть отрицательной`);
+    errorFields.push(els.windSpeed);
+  }
+
+  if (errors.length > 0) {
+    showError(errors.join(' · '), errorFields);
+    return false;
+  }
+  return true;
+}
+
+// Clear error highlight on input change
+for (const key in els) {
+  els[key].addEventListener('input', () => {
+    els[key].classList.remove('input-error');
+  });
+}
+
 // --- Main Calculation ---
 
 function calculate() {
@@ -232,6 +323,8 @@ function calculate() {
     alert('Сначала выберите орудие и убедитесь, что таблицы загружены.');
     return;
   }
+
+  if (!validateInputs()) return;
 
   saveInputs();
 
@@ -337,6 +430,9 @@ function calculate() {
     // 5f. Azimuth correction from crosswind
     const azCorrection = -(windCross * azFactorV);
 
+    // Skip if any result is NaN (corrupted table data)
+    if (isNaN(finalElev) || isNaN(finalTOF) || isNaN(azCorrection)) continue;
+
     candidates.push({
       charge: chargeKey,
       elev: finalElev,
@@ -348,6 +444,11 @@ function calculate() {
 
   // 6. Display results
   displayResults(distGeo, azimuthMil, altDiff, windTail, windCross, candidates);
+
+  // 7. Save to history if successful (candidates already sorted by TOF in displayResults)
+  if (candidates.length > 0) {
+    addToHistory(currentWeapon, gX, gY, tX, tY, candidates[0], azimuthMil);
+  }
 }
 
 // --- Display ---
@@ -412,15 +513,97 @@ function displayResults(distGeo, azimuthMil, altDiff, windTail, windCross, candi
   }
 }
 
+// --- History ---
+
+const HISTORY_KEY = 'artyCalcHistory';
+const MAX_HISTORY = 10;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch (e) { return []; }
+}
+
+function saveHistory(history) {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e) { /* ignore */ }
+}
+
+function addToHistory(weaponKey, gunX, gunY, tgtX, tgtY, best, azimuthMil) {
+  const history = loadHistory();
+  const entry = {
+    ts: Date.now(),
+    weapon: weaponKey,
+    weaponName: getWeaponDisplayName(weaponKey),
+    gunX, gunY, tgtX, tgtY,
+    charge: best.charge,
+    elev: best.elev.toFixed(1),
+    az: normalizeAz(azimuthMil + best.azCorr).toFixed(1),
+    tof: best.tof.toFixed(1)
+  };
+  history.unshift(entry);
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+  saveHistory(history);
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = loadHistory();
+  if (history.length === 0) {
+    historyPanel.classList.add('hidden');
+    return;
+  }
+  historyPanel.classList.remove('hidden');
+  historyBody.innerHTML = '';
+  history.forEach((h, i) => {
+    const tr = document.createElement('tr');
+    tr.title = 'Нажмите для загрузки параметров';
+    tr.innerHTML =
+      `<td>${i + 1}</td>` +
+      `<td style="font-size:0.7rem">${h.weaponName || h.weapon}</td>` +
+      `<td>${h.gunX},${h.gunY}</td>` +
+      `<td>${h.tgtX},${h.tgtY}</td>` +
+      `<td>${h.charge}</td>` +
+      `<td>${h.elev}</td>` +
+      `<td>${h.az}</td>` +
+      `<td>${h.tof}</td>`;
+    tr.addEventListener('click', () => restoreFromHistory(h));
+    historyBody.appendChild(tr);
+  });
+}
+
+function restoreFromHistory(h) {
+  // Restore weapon
+  if (weaponsDb[h.weapon]) {
+    weaponSelect.value = h.weapon;
+    currentWeapon = h.weapon;
+  }
+  // Restore coordinates
+  els.gunX.value = h.gunX;
+  els.gunY.value = h.gunY;
+  els.tgtX.value = h.tgtX;
+  els.tgtY.value = h.tgtY;
+  saveInputs();
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function clearHistory() {
+  try { localStorage.removeItem(HISTORY_KEY); } catch (e) { /* ignore */ }
+  renderHistory();
+}
+
 // --- Event Listeners ---
 
 loadDefaultTables();
+renderHistory();
 
 weaponSelect.addEventListener('change', (e) => {
   currentWeapon = e.target.value;
 });
 
 calcBtn.addEventListener('click', calculate);
+
+clearHistoryBtn.addEventListener('click', clearHistory);
 
 // Save inputs on change
 for (const key in els) {

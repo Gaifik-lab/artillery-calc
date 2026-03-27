@@ -77,8 +77,11 @@ function parseCSV(text) {
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    const cols = line.split(/[,\t;]/).map(v => parseFloat(v.replace(',', '.')));
-    if (!isNaN(cols[0]) && !isNaN(cols[1])) data.push(cols);
+    const cols = line.split(/[,\t;]/).map(v => {
+      const n = parseFloat(v.replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    });
+    if (cols.length >= 2 && cols[1] > 0) data.push(cols);
   }
   return data;
 }
@@ -134,6 +137,11 @@ assertEqual(parseCSV(csvEmpty).length, 0, 'parseCSV: empty lines → 0 rows');
 
 const csvSemicolon = "H1;H2\n1;100\n2;200";
 assertEqual(parseCSV(csvSemicolon).length, 2, 'parseCSV: semicolon delimiter');
+
+const csvDashes = "H1,H2,H3,H4\n0,1750,1208,-\n0,1800,1194,10.6";
+const rDash = parseCSV(csvDashes);
+assertEqual(rDash.length, 2, 'parseCSV: rows with dashes are kept');
+assertEqual(rDash[0][3], 0, 'parseCSV: dash parsed as 0');
 
 section('findBracket');
 const testTable = [[0,100],[0,200],[0,300],[0,400]];
